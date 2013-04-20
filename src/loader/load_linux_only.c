@@ -261,8 +261,47 @@ usb_dev_handle * open_usb_device(int vid, int pid)
 
 static usb_dev_handle *libusb_teensy_handle = NULL;
 
+static void switch_to_mini(void)
+{
+  /* reboot the mcu so that control gets back to mini54tan */
+  /* refer to usb_dev.c, CDC_SET_LINE_CODING, usb_reboot_timer */
+
+  static const uint8_t buf[8] = { 134, };
+
+  usb_dev_handle* mcu_handle;
+  usb_dev_handle* mini_handle;
+
+  int usb_err;
+
+  mcu_handle = open_usb_device(0x16C0, 0x0483);
+  if (mcu_handle == NULL) return ;
+
+  usb_err = usb_control_msg(mcu_handle, 0x21, 0x20, 0, 0, (void*)buf, 8, 100);
+  if (usb_err < 0)
+  {
+    printf("usb error: %s\n", usb_strerror());
+    goto skip_mini;
+  }
+
+  while (1)
+  {
+    mini_handle = open_usb_device(0x16C0, 0x0478);
+    if (mini_handle)
+    {
+      usb_release_interface(mini_handle, 0);
+      usb_close(mini_handle);
+      break ;
+    }
+  }
+
+  skip_mini:
+  usb_release_interface(mcu_handle, 0);
+  usb_close(mcu_handle);
+}
+
 int teensy_open(void)
 {
+	switch_to_mini();
 	teensy_close();
 	libusb_teensy_handle = open_usb_device(0x16C0, 0x0478);
 	if (libusb_teensy_handle) return 1;
