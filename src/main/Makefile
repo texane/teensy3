@@ -68,8 +68,11 @@ $(TARGET).elf: $(OBJS) core/mk20dx128.ld
 %.hex: %.elf
 	$(SIZE) $<
 	$(OBJCOPY) -O ihex -R .eeprom $< $@
-	$(abspath $(TOOLSPATH))/teensy_post_compile -file=$(basename $@) -path=$(shell pwd) -tools=$(abspath $(TOOLSPATH))/
-	-$(abspath $(TOOLSPATH))/teensy_reboot
+
+program: $(TARGET).hex
+	(cd ../loader && ./do_run.sh ../main/main.hex )
+#	$(abspath $(TOOLSPATH))/teensy_post_compile -file=$(basename $@) -path=$(shell pwd) -tools=$(abspath $(TOOLSPATH))/
+#	-$(abspath $(TOOLSPATH))/teensy_reboot
 
 
 # compiler generated dependency info
