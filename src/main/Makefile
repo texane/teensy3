@@ -12,7 +12,7 @@ OPTIONS = -DF_CPU=48000000 -DUSB_SERIAL -DLAYOUT_US_ENGLISH
 # locations and edit the pathnames.  The rest of Arduino is not needed.
 #************************************************************************
 
-TOPDIR = $(HOME)/repo/teensy3/arduino-1.0.1
+TOPDIR = $(HOME)/repo/arduino/arduino-1.0.5-teensy
 HWDIR = $(TOPDIR)/hardware
 
 # path location for Teensy Loader, teensy_post_compile and teensy_reboot
