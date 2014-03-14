@@ -1,3 +1,7 @@
+#ifndef SPI_C_INCLUDED
+#define SPI_C_INCLUDED
+
+
 #include <stdint.h>
 #include "mk20dx128.h"
 
@@ -282,3 +286,6 @@ static inline void spi_write_512(const uint8_t* s)
 {
   return spi_write(s, 512);
 }
+
+
+#endif /* SPI_C_INCLUDED */

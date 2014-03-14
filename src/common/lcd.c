@@ -1,3 +1,7 @@
+#ifndef LCD_C_INCLUDED
+#define LCD_C_INCLUDED
+
+
 #include <stdint.h>
 #include "mk20dx128.h"
 
@@ -269,3 +273,6 @@ static void lcd_write(const uint8_t* s, unsigned int n)
   }
   LCD_PORT_RS &= ~LCD_MASK_RS;
 }
+
+
+#endif /* LCD_C_INCLUDED */

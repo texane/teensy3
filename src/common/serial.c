@@ -1,3 +1,7 @@
+#ifndef SERIAL_C_INCLUDED
+#define SERIAL_C_INCLUDED
+
+
 #include <stdint.h>
 #include "mk20dx128.h"
 
@@ -86,3 +90,6 @@ static uint8_t serial_read_uint8(void)
 {
   return (uint8_t)usb_serial_getchar();
 }
+
+
+#endif /* SERIAL_C_INCLUDED */

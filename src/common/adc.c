@@ -1,3 +1,7 @@
+#ifndef ADC_C_INCLUDED
+#define ADC_C_INCLUDED
+
+
 #include <stdint.h>
 #include "mk20dx128.h"
 
@@ -170,3 +174,6 @@ static void adc_setup(void)
 
   adc_calibrate();
 }
+
+
+#endif /* ADC_C_INCLUDED */

@@ -1,3 +1,7 @@
+#ifndef SD_C_INCLUDED
+#define SD_C_INCLUDED
+
+
 #include <stdint.h>
 #include "mk20dx128.h"
 #include "spi.c"
@@ -9,7 +13,11 @@
 /* debugging */
 
 #define CONFIG_SD_DEBUG 1
+
+#include "serial.c"
+
 #if CONFIG_SD_DEBUG
+
 #define XSTR(__s) STR(__s)
 #define STR(__s) #__s
 #define PRINT_FAIL() serial_write_string(XSTR(__LINE__) ": fail\r\n")
@@ -20,10 +28,13 @@ do {							\
   serial_write_hex(__p, __n);				\
   serial_write_string("\r\n");				\
 } while (0)
+
 #else
+
 #define PRINT_FAIL()
 #define PRINT_PASS()
 #define PRINT_BUF(__p, __n)
+
 #endif /* CONFIG_SD_DEBUG */
 
 
@@ -169,6 +180,8 @@ __attribute__((unused)) static int sd_read_csd(void)
   return 0;
 }
 
+#if CONFIG_SD_DEBUG
+
 __attribute__((unused)) static void sd_print_csd(void)
 {
   struct csd_v1
@@ -257,6 +270,8 @@ __attribute__((unused)) static void sd_print_csd(void)
   serial_write_hex(&x, 1);
   serial_write_string("\r\n");
 }
+
+#endif /* CONFIG_SD_DEBUG */
 
 __attribute__((unused))
 static int sd_write_csd(void)
@@ -481,3 +496,6 @@ static int sd_setup(void)
 
   return 0;
 }
+
+
+#endif /* SD_C_INCLUDED */
