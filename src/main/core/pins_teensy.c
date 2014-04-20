@@ -1,3 +1,32 @@
+/* Teensyduino Core Library
+ * http://www.pjrc.com/teensy/
+ * Copyright (c) 2013 PJRC.COM, LLC.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * 1. The above copyright notice and this permission notice shall be 
+ * included in all copies or substantial portions of the Software.
+ *
+ * 2. If the Software is incorporated into a build system that allows 
+ * selection among a list of target devices, then similar target
+ * devices manufactured by PJRC.COM must be included in the list of
+ * target devices and selectable in the same manner.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 #include "core_pins.h"
 #include "pins_arduino.h"
@@ -194,168 +223,6 @@ void porte_isr(void)
 
 
 
-
-
-
-
-#define MIN_PULSE_WIDTH       544     // the shortest pulse sent to a servo  
-#define MAX_PULSE_WIDTH      2400     // the longest pulse sent to a servo 
-#define DEFAULT_PULSE_WIDTH  1500     // default pulse width when servo is attached
-#define REFRESH_INTERVAL    20000     // minumim time to refresh servos in microseconds 
-
-#define PDB_CONFIG (PDB_SC_TRGSEL(15) | PDB_SC_PDBEN | PDB_SC_PDBIE \
-	| PDB_SC_CONT | PDB_SC_PRESCALER(2) | PDB_SC_MULT(0))
-#define PDB_PRESCALE 4
-#define usToTicks(us)    ((us) * (F_BUS / 1000) / PDB_PRESCALE / 1000)
-#define ticksToUs(ticks) ((ticks) * PDB_PRESCALE * 1000 / (F_BUS / 1000))
-
-
-uint16_t servo_active_mask = 0;
-uint8_t servo_pin[12];
-uint16_t servo_ticks[12];
-
-void init_servo(void)
-{
-	// for servo
-	SIM_SCGC6 |= SIM_SCGC6_PDB;	// TODO: use bitband for atomic read-mod-write
-	pinMode(12, OUTPUT);
-	PDB0_MOD = 0xFFFF;
-	PDB0_CNT = 0;
-	PDB0_IDLY = 0;
-	PDB0_SC = PDB_CONFIG;
-	NVIC_ENABLE_IRQ(IRQ_PDB);
-	// TODO: maybe this should be a higher priority than most
-	// other interrupts (init all to some default?)
-	PDB0_SC = PDB_CONFIG | PDB_SC_SWTRIG;
-
-	//servo_active_mask = 9;
-	servo_active_mask = 8;
-	//servo_pin[0] = 12;
-	//servo_ticks[0] = usToTicks(600);
-	servo_pin[3] = 11;
-	servo_ticks[3] = usToTicks(2100);
-	//pinMode(12, OUTPUT);
-	pinMode(11, OUTPUT);
-}
-
-void pdb_isr(void)
-{
-	static int8_t channel=0, channel_high=12;
-	static uint32_t tick_accum=0;
-	uint32_t ticks;
-	int32_t wait_ticks;
-
-	// first, if any channel was left high from the previous
-	// run, now is the time to shut it off
-	if (servo_active_mask & (1<<channel_high)) {
-		digitalWrite(servo_pin[channel_high], LOW);
-		channel_high = 12;
-	}
-	// search for the next channel to turn on
-	while (channel < 12) {
-		if (servo_active_mask & (1<<channel)) {
-			digitalWrite(servo_pin[channel], HIGH);
-			channel_high = channel;
-			ticks = servo_ticks[channel];
-			tick_accum += ticks;
-			PDB0_IDLY += ticks;
-			PDB0_SC = PDB_CONFIG | PDB_SC_LDOK;
-			channel++;
-			return;
-		}
-		channel++;
-	}
-	// when all channels have output, wait for the
-	// minimum refresh interval
-	wait_ticks = usToTicks(REFRESH_INTERVAL) - tick_accum;
-	if (wait_ticks < usToTicks(100)) wait_ticks = usToTicks(100);
-	else if (wait_ticks > 60000) wait_ticks = 60000;
-	tick_accum += wait_ticks;
-	PDB0_IDLY += wait_ticks;
-	PDB0_SC = PDB_CONFIG | PDB_SC_LDOK;
-	// if this wait is enough to satisfy the refresh
-	// interval, next time begin again at channel zero 
-	if (tick_accum >= usToTicks(REFRESH_INTERVAL)) {
-		tick_accum = 0;
-		channel = 0;
-	}
-}
-
-
-
-static uint32_t tone_toggle_count;
-static uint8_t *tone_reg;
-static uint8_t tone_pin;
-
-
-void init_tone(void)
-{
-	SIM_SCGC6 |= SIM_SCGC6_PIT; // TODO: use bitband for atomic read-mod-write
-	PIT_MCR = 0;
-	PIT_TCTRL3 = 0;		// disabled
-	tone_pin = 255;
-	NVIC_ENABLE_IRQ(IRQ_PIT_CH3);
-}
-
-void tone(uint8_t pin, uint16_t frequency, uint32_t duration)
-{
-	uint32_t count, load;
-	volatile uint32_t *config;
-
-	if (pin >= CORE_NUM_DIGITAL) return;
-	if (duration) {
-		count = (frequency * duration / 1000) * 2;
-	} else {
-		count = 0xFFFFFFFF;
-	}
-	load = (F_BUS / 2) / frequency;
-	config = portConfigRegister(pin);
-	__disable_irq();
-	if (pin != tone_pin) {
-		if (tone_pin < CORE_NUM_DIGITAL) {
-			tone_reg[0] = 1; // clear pin
-		}
-		tone_pin = pin;
-		tone_reg = portClearRegister(pin);
-		tone_reg[0] = 1; // clear pin
-		tone_reg[384] = 1; // output mode;
-		*config = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
-	}
-	tone_toggle_count = count;
-	if (PIT_LDVAL3 != load) {
-		PIT_TCTRL3 = 0;
-		PIT_LDVAL3 = load;
-		PIT_TCTRL3 = 3;
-	}
-	__enable_irq();
-}
-
-void pit3_isr(void)
-{
-	PIT_TFLG3 = 1;
-
-	if (tone_toggle_count) {
-		tone_reg[128] = 1; // toggle
-		if (tone_toggle_count < 0xFFFFFFFF) tone_toggle_count--;
-	} else {
-		PIT_TCTRL3 = 0;
-		tone_reg[0] = 0; // clear
-		tone_pin = 255;
-	}
-}
-
-void noTone(uint8_t pin)
-{
-	if (pin >= CORE_NUM_DIGITAL) return;
-	__disable_irq();
-	if (pin == tone_pin) {
-		PIT_TCTRL3 = 0;
-		tone_reg[0] = 0; // clear
-		tone_pin = 255;
-	}
-	__enable_irq();
-}
-
 unsigned long rtc_get(void)
 {
 	return RTC_TSR;
@@ -449,6 +316,17 @@ void init_rtc(void)
 }
 #endif
 
+extern void usb_init(void);
+
+
+// create a default PWM at the same 488.28 Hz as Arduino Uno
+#if F_BUS == 48000000
+#define DEFAULT_FTM_MOD (49152 - 1)
+#define DEFAULT_FTM_PRESCALE 1
+#else
+#define DEFAULT_FTM_MOD (49152 - 1)
+#define DEFAULT_FTM_PRESCALE 0
+#endif
 
 //void init_pins(void)
 void _init_Teensyduino_internal_(void)
@@ -458,7 +336,7 @@ void _init_Teensyduino_internal_(void)
 	//SIM_SCGC6 |= SIM_SCGC6_FTM0;	// TODO: use bitband for atomic read-mod-write
 	//SIM_SCGC6 |= SIM_SCGC6_FTM1;
 	FTM0_CNT = 0;
-	FTM0_MOD = 32767;
+	FTM0_MOD = DEFAULT_FTM_MOD;
 	FTM0_C0SC = 0x28; // MSnB:MSnA = 10, ELSnB:ELSnA = 10
 	FTM0_C1SC = 0x28;
 	FTM0_C2SC = 0x28;
@@ -467,47 +345,82 @@ void _init_Teensyduino_internal_(void)
 	FTM0_C5SC = 0x28;
 	FTM0_C6SC = 0x28;
 	FTM0_C7SC = 0x28;
-	FTM0_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0);
+	FTM0_SC = FTM_SC_CLKS(1) | FTM_SC_PS(DEFAULT_FTM_PRESCALE);
 	FTM1_CNT = 0;
-	FTM1_MOD = 32767;
+	FTM1_MOD = DEFAULT_FTM_MOD;
 	FTM1_C0SC = 0x28;
 	FTM1_C1SC = 0x28;
-	FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0);
+	FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(DEFAULT_FTM_PRESCALE);
+#if defined(__MK20DX256__)
+	FTM2_CNT = 0;
+	FTM2_MOD = DEFAULT_FTM_MOD;
+	FTM2_C0SC = 0x28;
+	FTM2_C1SC = 0x28;
+	FTM2_SC = FTM_SC_CLKS(1) | FTM_SC_PS(DEFAULT_FTM_PRESCALE);
+#endif
 
 	analog_init();
-	//init_servo();
-	init_tone();
 	//delay(100); // TODO: this is not necessary, right?
+	delay(4);
 	usb_init();
 }
 
 
 
+static uint8_t analog_write_res = 8;
+
 // SOPT4 is SIM select clocks?
 // FTM is clocked by the bus clock, either 24 or 48 MHz
 // input capture can be FTM1_CH0, CMP0 or CMP1 or USB start of frame
 // 24 MHz with reload 49152 to match Arduino's speed = 488.28125 Hz
-// 24 MHz with reload 32768 creates a PWM output = 732.421875 Hz
 
 void analogWrite(uint8_t pin, int val)
 {
-	uint32_t cval;
+	uint32_t cval, max;
 
-	pinMode(pin, OUTPUT);
+#if defined(__MK20DX256__)
+	if (pin == A14) {
+		uint8_t res = analog_write_res;
+		if (res < 12) {
+			val <<= 12 - res;
+		} else if (res > 12) {
+			val >>= res - 12;
+		}
+		analogWriteDAC0(val);
+		return;
+	}
+#endif
+
+	max = 1 << analog_write_res;
 	if (val <= 0) {
 		digitalWrite(pin, LOW);
 		pinMode(pin, OUTPUT);	// TODO: implement OUTPUT_LOW
 		return;
-	} else if (val > 255) {
+	} else if (val >= max) {
 		digitalWrite(pin, HIGH);
 		pinMode(pin, OUTPUT);	// TODO: implement OUTPUT_HIGH
 		return;
 	}
+
+	//serial_print("analogWrite\n");
+	//serial_print("val = ");
+	//serial_phex32(val);
+	//serial_print("\n");
+	//serial_print("analog_write_res = ");
+	//serial_phex(analog_write_res);
+	//serial_print("\n");
 	if (pin == 3 || pin == 4) {
-		cval = (val * (FTM1_MOD + 1)) >> 8;
+		cval = ((uint32_t)val * (uint32_t)(FTM1_MOD + 1)) >> analog_write_res;
+#if defined(__MK20DX256__)
+	} else if (pin == 25 || pin == 32) {
+		cval = ((uint32_t)val * (uint32_t)(FTM2_MOD + 1)) >> analog_write_res;
+#endif
 	} else {
-		cval = (val * (FTM0_MOD + 1)) >> 8;
+		cval = ((uint32_t)val * (uint32_t)(FTM0_MOD + 1)) >> analog_write_res;
 	}
+	//serial_print("cval = ");
+	//serial_phex32(cval);
+	//serial_print("\n");
 	switch (pin) {
 	  case 3: // PTA12, FTM1_CH0
 		FTM1_C0V = cval;
@@ -549,10 +462,72 @@ void analogWrite(uint8_t pin, int val)
 		FTM0_C1V = cval;
 		CORE_PIN23_CONFIG = PORT_PCR_MUX(4) | PORT_PCR_DSE | PORT_PCR_SRE;
 		break;
+#if defined(__MK20DX256__)
+	  case 32: // PTB18, FTM2_CH0
+		FTM2_C0V = cval;
+		CORE_PIN32_CONFIG = PORT_PCR_MUX(3) | PORT_PCR_DSE | PORT_PCR_SRE;
+		break;
+	  case 25: // PTB19, FTM1_CH1
+		FTM2_C1V = cval;
+		CORE_PIN25_CONFIG = PORT_PCR_MUX(3) | PORT_PCR_DSE | PORT_PCR_SRE;
+		break;
+#endif
 	  default:
 		digitalWrite(pin, (val > 127) ? HIGH : LOW);
+		pinMode(pin, OUTPUT);
 	}
 }
+
+void analogWriteRes(uint32_t bits)
+{
+	if (bits < 1) {
+		bits = 1;
+	} else if (bits > 16) {
+		bits = 16;
+	}
+	analog_write_res = bits;
+}
+
+void analogWriteFrequency(uint8_t pin, uint32_t frequency)
+{
+	uint32_t minfreq, prescale, mod;
+
+	//serial_print("analogWriteFrequency: pin = ");
+	//serial_phex(pin);
+	//serial_print(", freq = ");
+	//serial_phex32(frequency);
+	//serial_print("\n");
+	for (prescale = 0; prescale < 7; prescale++) {
+		minfreq = (F_BUS >> 16) >> prescale;
+		if (frequency > minfreq) break;
+	}
+	//serial_print("F_BUS = ");
+	//serial_phex32(F_BUS >> prescale);
+	//serial_print("\n");
+	//serial_print("prescale = ");
+	//serial_phex(prescale);
+	//serial_print("\n");
+	//mod = ((F_BUS >> prescale) / frequency) - 1;
+	mod = (((F_BUS >> prescale) + (frequency >> 1)) / frequency) - 1;
+	if (mod > 65535) mod = 65535;
+	//serial_print("mod = ");
+	//serial_phex32(mod);
+	//serial_print("\n");
+	if (pin == 3 || pin == 4) {
+		FTM1_SC = 0;
+		FTM1_CNT = 0;
+		FTM1_MOD = mod;
+		FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(prescale);
+	} else if (pin == 5 || pin == 6 || pin == 9 || pin == 10 ||
+	  (pin >= 20 && pin <= 23)) {
+		FTM0_SC = 0;
+		FTM0_CNT = 0;
+		FTM0_MOD = mod;
+		FTM0_SC = FTM_SC_CLKS(1) | FTM_SC_PS(prescale);
+	}
+}
+
+
 
 
 // TODO: startup code needs to initialize all pins to GPIO mode, input by default
@@ -571,9 +546,11 @@ void digitalWrite(uint8_t pin, uint8_t val)
 		if (val) {
 			// TODO use bitband for atomic read-mod-write
 			*config |= (PORT_PCR_PE | PORT_PCR_PS);
+			//*config = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS;
 		} else {
 			// TODO use bitband for atomic read-mod-write
-			*config &= PORT_PCR_PE;
+			*config &= ~(PORT_PCR_PE);
+			//*config = PORT_PCR_MUX(1);
 		}
 	}
 
@@ -670,13 +647,10 @@ uint8_t shiftIn_msbFirst(uint8_t dataPin, uint8_t clockPin)
 
 
 
-// the millis counter... not "timer0" anymore, but keeping Teensy 2.0 name
-volatile uint32_t timer0_millis_count __attribute__ ((aligned (4))) = 0;
+// the systick interrupt is supposed to increment this at 1 kHz rate
+volatile uint32_t systick_millis_count = 0;
 
-void systick_isr(void)
-{
-	timer0_millis_count++;
-}
+//uint32_t systick_current, systick_count, systick_istatus;  // testing only
 
 uint32_t micros(void)
 {
@@ -684,10 +658,13 @@ uint32_t micros(void)
 
 	__disable_irq();
 	current = SYST_CVR;
-	count = timer0_millis_count;
+	count = systick_millis_count;
 	istatus = SCB_ICSR;	// bit 26 indicates if systick exception pending
 	__enable_irq();
-	if ((istatus & SCB_ICSR_PENDSTSET) && current > ((F_CPU / 1000) - 50)) count++;
+	 //systick_current = current;
+	 //systick_count = count;
+	 //systick_istatus = istatus & SCB_ICSR_PENDSTSET ? 1 : 0;
+	if ((istatus & SCB_ICSR_PENDSTSET) && current > 50) count++;
 	current = ((F_CPU / 1000) - 1) - current;
 	return count * 1000 + current / (F_CPU / 1000000);
 }
@@ -696,10 +673,14 @@ void delay(uint32_t ms)
 {
 	uint32_t start = micros();
 
-	while (ms > 0) {
-		if ((micros() - start) >= 1000) {
-			ms--;
-			start += 1000;
+	if (ms > 0) {
+		while (1) {
+			if ((micros() - start) >= 1000) {
+				ms--;
+				if (ms == 0) return;
+				start += 1000;
+			}
+			yield();
 		}
 	}
 }

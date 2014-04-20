@@ -1,7 +1,8 @@
 TARGET = main
 OPTIONS = -DF_CPU=48000000 -DUSB_SERIAL -DLAYOUT_US_ENGLISH
+OPTIONS += -D__MK20DX256__ -DARDUIO=104
 
-TOPDIR = $(HOME)/repo/arduino/arduino-1.0.5-teensy
+TOPDIR = $(HOME)/repo/arduino/arduino-1.0.5
 HWDIR = $(TOPDIR)/hardware
 
 TOOLSPATH = $(HWDIR)/tools
@@ -16,7 +17,7 @@ CXXFLAGS = -std=c++0x -felide-constructors -fno-exceptions -fno-rtti -Icore
 
 CFLAGS = -Icore -I$(HOME)/repo/teensy3/src/common
 
-LDFLAGS = -Os -Wl,--gc-sections -mcpu=cortex-m4 -mthumb -Tcore/mk20dx128.ld
+LDFLAGS = -Os -Wl,--gc-sections -mcpu=cortex-m4 -mthumb -Tcore/mk20dx256.ld
 
 LIBS = -lm
 
@@ -32,7 +33,7 @@ OBJS := $(C_FILES:.c=.o) $(CPP_FILES:.cpp=.o)
 
 all: $(TARGET).hex
 
-$(TARGET).elf: $(OBJS) core/mk20dx128.ld
+$(TARGET).elf: $(OBJS) core/mk20dx256.ld
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 
 %.hex: %.elf
@@ -40,7 +41,7 @@ $(TARGET).elf: $(OBJS) core/mk20dx128.ld
 	$(OBJCOPY) -O ihex -R .eeprom $< $@
 
 program: $(TARGET).hex
-	sudo /home/texane/install/bin/teensy3_loader -v -mmcu=mk20dx128 main.hex
+	sudo /home/texane/repo/teensy3/src/teensy_loader_cli/teensy_loader_cli/teensy_loader_cli -v -mmcu=mk20dx256 main.hex
 
 # compiler generated dependency info
 -include $(OBJS:.o=.d)

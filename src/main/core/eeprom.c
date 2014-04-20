@@ -1,6 +1,36 @@
+/* Teensyduino Core Library
+ * http://www.pjrc.com/teensy/
+ * Copyright (c) 2013 PJRC.COM, LLC.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * 1. The above copyright notice and this permission notice shall be 
+ * included in all copies or substantial portions of the Software.
+ *
+ * 2. If the Software is incorporated into a build system that allows 
+ * selection among a list of target devices, then similar target
+ * devices manufactured by PJRC.COM must be included in the list of
+ * target devices and selectable in the same manner.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include "mk20dx128.h"
 #include <stdint.h>
-// #include "HardwareSerial.h"
+//#include "HardwareSerial.h"
 
 // The EEPROM is really RAM with a hardware-based backup system to
 // flash memory.  Selecting a smaller size EEPROM allows more wear
@@ -74,6 +104,7 @@ uint8_t eeprom_read_byte(const uint8_t *addr)
 {
 	uint32_t offset = (uint32_t)addr;
 	if (offset >= EEPROM_SIZE) return 0;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
 	return FlexRAM[offset];
 }
 
@@ -81,6 +112,7 @@ uint16_t eeprom_read_word(const uint16_t *addr)
 {
 	uint32_t offset = (uint32_t)addr;
 	if (offset >= EEPROM_SIZE-1) return 0;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
 	return *(uint16_t *)(&FlexRAM[offset]);
 }
 
@@ -88,9 +120,27 @@ uint32_t eeprom_read_dword(const uint32_t *addr)
 {
 	uint32_t offset = (uint32_t)addr;
 	if (offset >= EEPROM_SIZE-3) return 0;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
 	return *(uint32_t *)(&FlexRAM[offset]);
 }
 
+void eeprom_read_block(void *buf, const void *addr, uint32_t len)
+{
+	uint32_t offset = (uint32_t)addr;
+	uint8_t *dest = (uint8_t *)buf;
+	uint32_t end = offset + len;
+	
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
+	if (end > EEPROM_SIZE) end = EEPROM_SIZE;
+	while (offset < end) {
+		*dest++ = FlexRAM[offset++];
+	}
+}
+
+int eeprom_is_ready(void)
+{
+	return (FTFL_FCNFG & FTFL_FCNFG_EEERDY) ? 1 : 0;
+}
 
 static void flexram_wait(void)
 {
@@ -104,6 +154,7 @@ void eeprom_write_byte(uint8_t *addr, uint8_t value)
 	uint32_t offset = (uint32_t)addr;
 
 	if (offset >= EEPROM_SIZE) return;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
 	if (FlexRAM[offset] != value) {
 		FlexRAM[offset] = value;
 		flexram_wait();
@@ -115,6 +166,7 @@ void eeprom_write_word(uint16_t *addr, uint16_t value)
 	uint32_t offset = (uint32_t)addr;
 
 	if (offset >= EEPROM_SIZE-1) return;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
 #ifdef HANDLE_UNALIGNED_WRITES
 	if ((offset & 1) == 0) {
 #endif
@@ -141,6 +193,7 @@ void eeprom_write_dword(uint32_t *addr, uint32_t value)
 	uint32_t offset = (uint32_t)addr;
 
 	if (offset >= EEPROM_SIZE-3) return;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
 #ifdef HANDLE_UNALIGNED_WRITES
 	switch (offset & 3) {
 	case 0:
@@ -177,6 +230,56 @@ void eeprom_write_dword(uint32_t *addr, uint32_t value)
 	}
 #endif
 }
+
+void eeprom_write_block(const void *buf, void *addr, uint32_t len)
+{
+	uint32_t offset = (uint32_t)addr;
+	const uint8_t *src = (const uint8_t *)buf;
+
+	if (offset >= EEPROM_SIZE) return;
+	if (!(FTFL_FCNFG & FTFL_FCNFG_EEERDY)) eeprom_initialize();
+	if (len >= EEPROM_SIZE) len = EEPROM_SIZE;
+	if (offset + len >= EEPROM_SIZE) len = EEPROM_SIZE - offset;
+	while (len > 0) {
+		uint32_t lsb = offset & 3;
+		if (lsb == 0 && len >= 4) {
+			// write aligned 32 bits
+			uint32_t val32;
+			val32 = *src++;
+			val32 |= (*src++ << 8);
+			val32 |= (*src++ << 16);
+			val32 |= (*src++ << 24);
+			if (*(uint32_t *)(&FlexRAM[offset]) != val32) {
+				*(uint32_t *)(&FlexRAM[offset]) = val32;
+				flexram_wait();
+			}
+			offset += 4;
+			len -= 4;
+		} else if ((lsb == 0 || lsb == 2) && len >= 2) {
+			// write aligned 16 bits
+			uint16_t val16;
+			val16 = *src++;
+			val16 |= (*src++ << 8);
+			if (*(uint16_t *)(&FlexRAM[offset]) != val16) {
+				*(uint16_t *)(&FlexRAM[offset]) = val16;
+				flexram_wait();
+			}
+			offset += 2;
+			len -= 2;
+		} else {
+			// write 8 bits
+			uint8_t val8 = *src++;
+			if (FlexRAM[offset] != val8) {
+				FlexRAM[offset] = val8;
+				flexram_wait();
+			}
+			offset++;
+			len--;
+		}
+	}
+}
+
+
 
 
 /*

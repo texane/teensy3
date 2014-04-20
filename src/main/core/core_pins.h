@@ -1,3 +1,33 @@
+/* Teensyduino Core Library
+ * http://www.pjrc.com/teensy/
+ * Copyright (c) 2013 PJRC.COM, LLC.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * 1. The above copyright notice and this permission notice shall be 
+ * included in all copies or substantial portions of the Software.
+ *
+ * 2. If the Software is incorporated into a build system that allows 
+ * selection among a list of target devices, then similar target
+ * devices manufactured by PJRC.COM must be included in the list of
+ * target devices and selectable in the same manner.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef _core_pins_h_
 #define _core_pins_h_
 
@@ -65,9 +95,14 @@
 
 #define CORE_NUM_TOTAL_PINS     34
 #define CORE_NUM_DIGITAL        34
+#define CORE_NUM_INTERRUPT      34
+#if defined(__MK20DX128__)
 #define CORE_NUM_ANALOG         14
 #define CORE_NUM_PWM            10
-#define CORE_NUM_INTERRUPT      34
+#elif defined(__MK20DX256__)
+#define CORE_NUM_ANALOG         21
+#define CORE_NUM_PWM            12
+#endif
 
 #define CORE_PIN0_BIT		16
 #define CORE_PIN1_BIT		17
@@ -371,6 +406,43 @@
 #define CORE_RXD2_PIN		7
 #define CORE_TXD2_PIN		8
 
+#define CORE_INT0_PIN		0
+#define CORE_INT1_PIN		1
+#define CORE_INT2_PIN		2
+#define CORE_INT3_PIN		3
+#define CORE_INT4_PIN		4
+#define CORE_INT5_PIN		5
+#define CORE_INT6_PIN		6
+#define CORE_INT7_PIN		7
+#define CORE_INT8_PIN		8
+#define CORE_INT9_PIN		9
+#define CORE_INT10_PIN		10
+#define CORE_INT11_PIN		11
+#define CORE_INT12_PIN		12
+#define CORE_INT13_PIN		13
+#define CORE_INT14_PIN		14
+#define CORE_INT15_PIN		15
+#define CORE_INT16_PIN		16
+#define CORE_INT17_PIN		17
+#define CORE_INT18_PIN		18
+#define CORE_INT19_PIN		19
+#define CORE_INT20_PIN		20
+#define CORE_INT21_PIN		21
+#define CORE_INT22_PIN		22
+#define CORE_INT23_PIN		23
+#define CORE_INT24_PIN		24
+#define CORE_INT25_PIN		25
+#define CORE_INT26_PIN		26
+#define CORE_INT27_PIN		27
+#define CORE_INT28_PIN		28
+#define CORE_INT29_PIN		29
+#define CORE_INT30_PIN		30
+#define CORE_INT31_PIN		31
+#define CORE_INT32_PIN		32
+#define CORE_INT33_PIN		33
+#define CORE_INT_EVERY_PIN	1
+
+
 
 
 #ifdef __cplusplus
@@ -378,8 +450,8 @@ extern "C" {
 #endif
 
 void digitalWrite(uint8_t pin, uint8_t val);
-static void digitalWriteFast(uint8_t pin, uint8_t val) __attribute__((always_inline, unused));
-static void digitalWriteFast(uint8_t pin, uint8_t val)
+static inline void digitalWriteFast(uint8_t pin, uint8_t val) __attribute__((always_inline, unused));
+static inline void digitalWriteFast(uint8_t pin, uint8_t val)
 {
 	if (__builtin_constant_p(pin)) {
 		if (val) {
@@ -533,8 +605,8 @@ static void digitalWriteFast(uint8_t pin, uint8_t val)
 }
 
 uint8_t digitalRead(uint8_t pin);
-static uint8_t digitalReadFast(uint8_t pin) __attribute__((always_inline, unused));
-static uint8_t digitalReadFast(uint8_t pin)
+static inline uint8_t digitalReadFast(uint8_t pin) __attribute__((always_inline, unused));
+static inline uint8_t digitalReadFast(uint8_t pin)
 {
 	if (__builtin_constant_p(pin)) {
 		if (pin == 0) {
@@ -617,21 +689,20 @@ static uint8_t digitalReadFast(uint8_t pin)
 void pinMode(uint8_t pin, uint8_t mode);
 void init_pins(void);
 void analogWrite(uint8_t pin, int val);
+void analogWriteRes(uint32_t bits);
+static inline void analogWriteResolution(uint32_t bits) { analogWriteRes(bits); }
+void analogWriteFrequency(uint8_t pin, uint32_t frequency);
+void analogWriteDAC0(int val);
 void attachInterrupt(uint8_t pin, void (*function)(void), int mode);
 void detachInterrupt(uint8_t pin);
 void _init_Teensyduino_internal_(void);
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 int analogRead(uint8_t pin);
 void analogReference(uint8_t type);
 void analogReadRes(unsigned int bits);
+static inline void analogReadResolution(unsigned int bits) { analogReadRes(bits); }
+void analogReadAveraging(unsigned int num);
 void analog_init(void);
-#ifdef __cplusplus
-}
-#endif
 
 #define DEFAULT         0
 #define INTERNAL        2
@@ -681,14 +752,17 @@ static inline uint8_t shiftIn(uint8_t dataPin, uint8_t clockPin, uint8_t bitOrde
 void _reboot_Teensyduino_(void) __attribute__((noreturn));
 void _restart_Teensyduino_(void) __attribute__((noreturn));
 
+void yield(void);
+
 void delay(uint32_t msec);
 
-extern volatile uint32_t timer0_millis_count;
+extern volatile uint32_t systick_millis_count;
 
 static inline uint32_t millis(void) __attribute__((always_inline, unused));
 static inline uint32_t millis(void)
 {
-	return timer0_millis_count; // single aligned 32 bit is atomic;
+	volatile uint32_t ret = systick_millis_count; // single aligned 32 bit is atomic;
+	return ret;
 }
 
 uint32_t micros(void);
@@ -703,6 +777,7 @@ static inline void delayMicroseconds(uint32_t usec)
 #elif F_CPU == 24000000
 	uint32_t n = usec << 3;
 #endif
+	if (usec == 0) return;
 	asm volatile(
 		"L_%=_delayMicroseconds:"		"\n\t"
 		"subs   %0, #1"				"\n\t"
