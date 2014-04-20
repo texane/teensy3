@@ -41,7 +41,7 @@ $(TARGET).elf: $(OBJS) core/mk20dx256.ld
 	$(OBJCOPY) -O ihex -R .eeprom $< $@
 
 program: $(TARGET).hex
-	sudo /home/texane/repo/teensy3/src/teensy_loader_cli/teensy_loader_cli/teensy_loader_cli -v -mmcu=mk20dx256 main.hex
+	sudo $(HOME)/repo/teensy3/src/teensy_loader_cli/teensy_loader_cli -v -mmcu=mk20dx256 main.hex
 
 # compiler generated dependency info
 -include $(OBJS:.o=.d)
