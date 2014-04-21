@@ -150,7 +150,7 @@ static void adc0_setup(void)
   /* ADACKEN: async clock disabled */
   /* ADHSC: high speed disabled */
   /* ADLSTS: longest sample time (24 ADCK cycles) */
-  ADC0_CFG2 = ADC_CFG2_ADLSTS(2);
+  ADC0_CFG2 = ADC_CFG2_ADLSTS(0);
 
   /* ADC0_SC2, conversion, triggering */
   /* ADCTRG: software triggered conversion */
@@ -173,6 +173,20 @@ static void adc0_setup(void)
   ADC0_SC3 = 0;
 
   adc0_calibrate();
+}
+
+static void adc0_start_continuous(uint32_t chan)
+{
+  ADC0_SC3 |= 1 << 3;
+  adc0_enable(chan);
+}
+
+static uint32_t adc0_read_continuous(uint32_t chan)
+{
+  uint32_t x;
+  while ((ADC0_SC1A & ADC_SC1_COCO) == 0) ;
+  x = ADC0_RA;
+  return x;
 }
 
 

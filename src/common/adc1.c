@@ -148,7 +148,7 @@ static void adc1_setup(void)
   /* ADACKEN: async clock disabled */
   /* ADHSC: high speed disabled */
   /* ADLSTS: longest sample time (24 ADCK cycles) */
-  ADC1_CFG2 = ADC_CFG2_ADLSTS(2);
+  ADC1_CFG2 = ADC_CFG2_ADLSTS(0);
 
   /* ADC1_SC2, conversion, triggering */
   /* ADCTRG: software triggered conversion */
@@ -173,5 +173,18 @@ static void adc1_setup(void)
   adc1_calibrate();
 }
 
+static void adc1_start_continuous(uint32_t chan)
+{
+  ADC1_SC3 |= 1 << 3;
+  adc1_enable(chan);
+}
+
+static uint32_t adc1_read_continuous(uint32_t chan)
+{
+  uint32_t x;
+  while ((ADC1_SC1A & ADC_SC1_COCO) == 0) ;
+  x = ADC1_RA;
+  return x;
+}
 
 #endif /* ADC1_C_INCLUDED */
