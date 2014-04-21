@@ -124,8 +124,7 @@ static void adc1_setup(void)
 #endif /* ADC1_USE_INTERNAL_VREF */
 
   /* enable ADC1 module */
-  /* note: no SIM_SCGC6_ADC1 */
-  SIM_SCGC6 |= SIM_SCGC6_ADC0;
+  SIM_SCGC3 |= 1 << 27;
 
   /* ADC1_SC1A, status control register */
   /* AIEN: interrupt disabled */
