@@ -34,4 +34,32 @@ static void dac_disable(void)
 }
 
 
+#if 0 /* dac unit test */
+
+static void finer_delay(void)
+{
+  volatile uint32_t x;
+  for (x = 0; x != 100; ++x) ;
+}
+
+int main(void)
+{
+  uint16_t x;
+
+  dac_setup();
+
+  dac_enable();
+
+  for (x = 0; 1; ++x)
+  {
+    finer_delay();
+    dac_set(x);
+  }
+
+  return 0;
+}
+
+#endif /* dac unit test */
+
+
 #endif /* DAC_C_INCLUDED */
