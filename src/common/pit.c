@@ -68,4 +68,26 @@ static inline uint32_t pit_get_val(unsigned int i)
 }
 
 
+#if 0 /* unit */
+
+static uint32_t led_val = 0;
+
+void pit1_isr(void)
+{
+  led_val ^= 1;
+  led_set_val(led_val & 1);
+
+  pit_clear_int(1);
+}
+
+int main(void)
+{
+  led_setup();
+  pit_start(1, 24000000);
+  while (1) ;
+}
+
+#endif /* unit */
+
+
 #endif /* PIT_C_INCLUDED */
