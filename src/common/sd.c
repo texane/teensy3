@@ -498,4 +498,41 @@ static int sd_setup(void)
 }
 
 
+#if 0 /* sd unit test */
+
+static void print_data(const uint8_t* p, unsigned int n)
+{
+  unsigned int i;
+
+  for (i = 0; i != n; ++i)
+  {
+    if (i && ((i % 8) == 0)) SERIAL_WRITE_STRING("\r\n");
+    serial_write(uint8_to_string(p[i]), 2);
+  }
+  SERIAL_WRITE_STRING("\r\n");
+}
+
+int main(void)
+{
+  unsigned int i;
+
+  serial_setup();
+  sd_setup();
+
+  sd_erase(0x2a, 4);
+  sd_read_block(0x2a);
+  print_data(sd_block_buf, SD_BLOCK_SIZE);
+  for (i = 0; i != SD_BLOCK_SIZE; ++i) sd_block_buf[i] = (uint8_t)i;
+  sd_write_block(0x2a);
+
+  for (i = 0; i != SD_BLOCK_SIZE; ++i) sd_block_buf[i] = 0x2a;
+  sd_read_block(0x2a);
+  print_data(sd_block_buf, SD_BLOCK_SIZE);
+
+  return 0;
+}
+
+#endif /* sd unit test */
+
+
 #endif /* SD_C_INCLUDED */
