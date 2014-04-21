@@ -70,6 +70,8 @@ static inline uint32_t pit_get_val(unsigned int i)
 
 #if 0 /* unit */
 
+#include "led.c"
+
 static uint32_t led_val = 0;
 
 void pit1_isr(void)
