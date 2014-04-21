@@ -87,6 +87,7 @@ int main(void)
   led_setup();
   pit_start(1, 24000000);
   while (1) ;
+  return 0;
 }
 
 #endif /* unit */
