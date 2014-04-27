@@ -91,5 +91,17 @@ static uint8_t serial_read_uint8(void)
   return (uint8_t)usb_serial_getchar();
 }
 
+extern int usb_serial_available(void);
+static uint32_t serial_get_rsize(void)
+{
+  return (uint32_t)usb_serial_available();
+}
+
+extern int usb_serial_read(void*, uint32_t);
+static int serial_read(uint8_t* p, uint32_t n)
+{
+  return usb_serial_read(p, n);
+}
+
 
 #endif /* SERIAL_C_INCLUDED */
