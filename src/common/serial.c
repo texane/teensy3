@@ -42,6 +42,23 @@ static uint8_t* uint16_to_string(uint16_t x)
   return buf;
 }
 
+__attribute__((unused))
+static uint8_t* uint32_to_string(uint32_t x)
+{
+  static uint8_t buf[8];
+
+  buf[7] = hex(nibble(x, 0));
+  buf[6] = hex(nibble(x, 1));
+  buf[5] = hex(nibble(x, 2));
+  buf[4] = hex(nibble(x, 3));
+  buf[3] = hex(nibble(x, 4));
+  buf[2] = hex(nibble(x, 5));
+  buf[1] = hex(nibble(x, 6));
+  buf[0] = hex(nibble(x, 7));
+
+  return buf;
+}
+
 #ifdef USB_SERIAL
 extern int usb_serial_putchar(uint8_t);
 extern int usb_serial_getchar(void);
