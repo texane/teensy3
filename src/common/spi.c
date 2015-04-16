@@ -112,6 +112,12 @@ static inline void spi_write_uint8(uint8_t x)
   SPI0_PUSHR = x;
 }
 
+static inline void spi_write_uint16(uint16_t x)
+{
+  spi_write_uint8((x >> 8) & 0xff);
+  spi_write_uint8((x >> 0) & 0xff);
+}
+
 static inline uint8_t spi_read_uint8(void)
 {
   /* rx fifo disabled */
@@ -219,6 +225,12 @@ static inline void softspi_write_uint8(uint8_t x)
   softspi_write_bit(x, 1 << 0);
 }
 
+static inline void softspi_write_uint16(uint16_t x)
+{
+  softspi_write_uint8((x >> 8) & 0xff);
+  softspi_write_uint8((x >> 0) & 0xff);
+}
+
 static inline void softspi_read_bit(uint8_t* x, uint8_t m)
 {
   /* mode0: data sampled at rising edge, propagated at falling edge */
@@ -258,6 +270,11 @@ static void spi_setup_master(void)
 static inline void spi_write_uint8(uint8_t x)
 {
   softspi_write_uint8(x);
+}
+
+static inline void spi_write_uint16(uint16_t x)
+{
+  softspi_write_uint16(x);
 }
 
 static inline uint8_t spi_read_uint8(void)
