@@ -5,13 +5,25 @@
 #include "mk20dx128.h"
 
 
+#ifdef DAC_USE_VREF
+#define DAC_VREF_MV 1200
+#else
+#define DAC_VREF_MV 3300
+#endif /* DAC_USE_VREF */
+
+
 static void dac_setup(void)
 {
   /* enable dac0 module */
   SIM_SCGC2 |= 1 << 12;
 
+#ifdef DAC_USE_VREF
+  /* dac is disabled. internal vref selected. */
+  DAC0_C0 = 0;
+#else
   /* dac is disabled. 3.3v selected. */
   DAC0_C0 = 1 << 6;
+#endif /* DAC_USE_VREF */
 
   /* single word buffer */
   DAC0_C1 = 0;
@@ -31,6 +43,13 @@ static void dac_enable(void)
 static void dac_disable(void)
 {
   DAC0_C0 &= ~(1 << 7);
+}
+
+static inline uint16_t dac_mv_to_val(uint32_t mv)
+{
+  /* DAC_VREF_MV * x / 4096 = mv */
+  /* x = mv * 4096 / DAC_VREF_MV */
+  return (mv * 4096) / DAC_VREF_MV;
 }
 
 
