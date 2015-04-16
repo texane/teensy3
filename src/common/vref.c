@@ -13,9 +13,9 @@ static void vref_setup(void)
   /* enable VREF module */
   SIM_SCGC4 |= SIM_SCGC4_VREF;
 
-  /* TRIM: minimum value, 1.2V */
+  /* TRIM: maximum value, 1.2V */
   /* CHOPEN: enabled */
-  VREF_TRM = 1 << 6;
+  VREF_TRM = (1 << 6) | 0x3f;
 
   /* VREFEN: internal voltage reference enabled */
   /* VREGEN: 1.75v internal regulator enabled */
